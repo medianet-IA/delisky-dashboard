@@ -268,22 +268,54 @@ if role in ["admin", "manager"]:
     with tabs[tab_idx]:
         st.header("🧠 رؤى وبوت ذكي")
         
-        # --- NEW CHATBOT SECTION ---
-        st.subheader("💬 اسأل بياناتك (Chat with Data)")
-        query = st.text_input("ماذا تريد أن تعرف عن المبيعات أو الشاحنات؟")
+        # --- ADVANCED CHATBOT LOGIC ---
+        st.subheader("💬 اسأل بياناتك (Advanced AI Query)")
+        query = st.text_input("مثال: ما هي السلع الضعيفة لشاحنة nita 2؟ أو مبيعات liv01؟")
+        
         if query:
-            # Simple Rule-based Chatbot logic
             q = query.lower()
-            if "أفضل" in q or "top" in q or "best" in q:
-                top_van = df_sales.groupby("VAN")["Total"].sum().idxmax()
-                st.success(f"أفضل شاحنة من حيث المبيعات هي: **{top_van}**")
-            elif "إجمالي" in q or "total" in q:
-                st.info(f"إجمالي الإيرادات الكلي هو: **{df_sales['Total'].sum():,.0f} DA**")
-            elif "liv01" in q:
-                liv01_sales = df_sales[df_sales["VAN"] == "BIFA PSLIV01"]["Total"].sum()
-                st.info(f"إجمالي مبيعات شاحنة LIV01 هو: **{liv01_sales:,.0f} DA**")
+            
+            # 1. Identify VAN
+            target_van = None
+            vans = df_sales["VAN"].unique()
+            for v in vans:
+                if v.lower().split()[-1] in q or v.lower() in q:
+                    target_van = v
+                    break
+            
+            # 2. Logic based on Intent
+            if "ضعيفة" in q or "أسوأ" in q or "low" in q or "weak" in q:
+                if target_van:
+                    v_items = df_items[df_items["VAN"] == target_van]
+                    worst = v_items.groupby("Article")["Qté vendue"].sum().sort_values().head(5)
+                    st.warning(f"📉 أقل 5 منتجات مبيعاً للشاحنة **{target_van}**:")
+                    st.table(worst)
+                else:
+                    worst = df_items.groupby("Article")["Qté vendue"].sum().sort_values().head(5)
+                    st.warning("📉 أقل 5 منتجات مبيعاً بشكل عام:")
+                    st.table(worst)
+                    
+            elif "قوية" in q or "أفضل" in q or "افضل" in q or "best" in q or "top" in q:
+                if target_van:
+                    v_items = df_items[df_items["VAN"] == target_van]
+                    best = v_items.groupby("Article")["Qté vendue"].sum().sort_values(ascending=False).head(5)
+                    st.success(f"🏆 أفضل 5 منتجات مبيعاً للشاحنة **{target_van}**:")
+                    st.table(best)
+                else:
+                    best = df_items.groupby("Article")["Qté vendue"].sum().sort_values(ascending=False).head(5)
+                    st.success("🏆 أفضل 5 منتجات مبيعاً في كل الشركة:")
+                    st.table(best)
+
+            elif "إجمالي" in q or "مبيعات" in q or "total" in q or "sales" in q:
+                if target_van:
+                    val = df_sales[df_sales["VAN"] == target_van]["Total"].sum()
+                    st.info(f"💰 إجمالي مبيعات **{target_van}** هو: **{val:,.0f} DA**")
+                else:
+                    val = df_sales["Total"].sum()
+                    st.info(f"💰 إجمالي المبيعات الكلي للشركة هو: **{val:,.0f} DA**")
+            
             else:
-                st.write("عذراً، لم أفهم السؤال بدقة. جرب اسأل عن 'أفضل شاحنة' أو 'إجمالي المبيعات'.")
+                st.write("🤖 عذراً، لم أفهم القصد تماماً. جرب أن تسأل عن: 'السلع الضعيفة لـ [اسم الشاحنة]' أو 'أفضل مبيعات'.")
         
         st.markdown("---")
         # [AI Insights (MBA, ABC)...]

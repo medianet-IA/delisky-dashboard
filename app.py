@@ -266,75 +266,94 @@ if role in ["admin", "manager"]:
     tab_idx += 1
 
     with tabs[tab_idx]:
-        st.header("🧠 رؤى وبوت ذكي")
+        st.header("🧠 عقل ديليسكي (Smart AI)")
         
-        # --- ADVANCED AI CHATBOT LOGIC (REFINED) ---
-        st.subheader("💬 اسأل بياناتك (Advanced AI Query)")
-        query = st.text_input("مثال: ما هي أضعف سلع لشاحنة bifa 3؟")
+        # --- DELISKY BRAIN: ULTRA-SMART QUERY ENGINE ---
+        query = st.text_input("💬 اسأل أي شيء (مثال: أضعف سلع بيفا 3؟ أو مبيعات شاحنا ت في وهران؟)")
         
         if query:
-            # Normalize Arabic: (أ، إ، آ) -> ا | (ة) -> ه
-            def normalize_ar(t):
-                return t.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ة','ه')
+            import difflib
             
-            q = normalize_ar(query.lower())
+            # Helper: Normalize and Clean Arabic
+            def clean_ar(text):
+                return text.lower().replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ة','ه').replace('ى','ي').strip()
             
-            # 1. SMART ENTITY EXTRACTION (VAN)
+            q_clean = clean_ar(query)
+            
+            # 1. FUZZY ENTITY EXTRACTION (VANs)
             target_van = None
-            all_vans = df_sales["VAN"].unique()
-            # Try to find a match (e.g., 'bifa 3' -> 'BIFA PSLIV03')
-            for v in all_vans:
-                v_norm = v.lower()
-                # If 'bifa 3' is in query, and it maps to 'bifa psliv03'
-                short_v = v_norm.replace('psliv0','').replace('psliv','')
-                if v_norm in q or short_v in q or (v_norm.split()[-1] in q and len(v_norm.split()[-1]) > 2):
-                    target_van = v
+            all_vans = df_sales["VAN"].unique().tolist()
+            
+            # Map shortcuts to real names
+            van_map = {
+                "bifa 1": "BIFA PSLIV01", "bifa 3": "BIFA PSLIV03",
+                "nita 1": "NITA PSLIV01", "nita 2": "NITA PSLIV02",
+                "بيفا 1": "BIFA PSLIV01", "بيفا 3": "BIFA PSLIV03",
+                "نيتا 1": "NITA PSLIV01", "نيتا 2": "NITA PSLIV02"
+            }
+            
+            # Check for direct map first
+            for key, val in van_map.items():
+                if key in q_clean or clean_ar(key) in q_clean:
+                    target_van = val
                     break
             
-            # Specials for 'bifa 3', 'nita 2' style shortcuts
+            # If not found, use fuzzy matching on the query words
             if not target_van:
-                if "bifa 1" in q: target_van = "BIFA PSLIV01"
-                if "bifa 3" in q: target_van = "BIFA PSLIV03"
-                if "nita 1" in q: target_van = "NITA PSLIV01"
-                if "nita 2" in q: target_van = "NITA PSLIV02"
+                words = q_clean.split()
+                for w in words:
+                    matches = difflib.get_close_matches(w, [v.lower() for v in all_vans], n=1, cutoff=0.6)
+                    if matches:
+                        # Find the original name
+                        for original in all_vans:
+                            if original.lower() == matches[0]:
+                                target_van = original
+                                break
+                        break
 
-            # 2. SMART INTENT DETECTION
-            is_weak = any(x in q for x in ["ضعيف", "اضعف", "اسوا", "اقل", "weak", "bad", "worst", "low"])
-            is_strong = any(x in q for x in ["قوي", "افضل", "احسن", "اكثر", "best", "top", "strong", "high", "great"])
-            is_sales = any(x in q for x in ["مبيعات", "اجمالي", "دخل", "ايرادات", "كم", "sales", "total", "revenue"])
+            # 2. INTENT SCORING
+            weak_keywords = ["ضعيف", "اضعف", "اسوا", "اقل", "راكد", "ناقص", "فاشل", "bad", "weak", "low", "worst"]
+            strong_keywords = ["قوي", "افضل", "احسن", "اكثر", "ناجح", "ممتاز", "best", "top", "strong", "high", "great"]
+            sales_keywords = ["مبيعات", "اجمالي", "دخل", "ايرادات", "فلوس", "بيع", "كم", "sales", "total", "revenue", "money"]
 
-            if is_weak:
+            # Score each intent
+            score_weak = sum(1 for k in weak_keywords if k in q_clean)
+            score_strong = sum(1 for k in strong_keywords if k in q_clean)
+            score_sales = sum(1 for k in sales_keywords if k in q_clean)
+
+            # 3. DYNAMIC RESPONSE GENERATION
+            if score_weak > 0:
                 if target_van:
                     v_items = df_items[df_items["VAN"] == target_van]
                     worst = v_items.groupby("Article")["Qté vendue"].sum().sort_values().head(5)
-                    st.warning(f"📉 أضعف 5 منتجات مبيعاً للشاحنة **{target_van}**:")
+                    st.warning(f"📉 **السلع الأضعف أداءً** للشاحنة **{target_van}**:")
                     st.table(worst)
                 else:
                     worst = df_items.groupby("Article")["Qté vendue"].sum().sort_values().head(8)
-                    st.warning("📉 أضعف المنتجات مبيعاً في الشركة بالكامل:")
+                    st.warning("📉 **السلع الأقل مبيعاً** على مستوى كل الشركة:")
                     st.table(worst)
                     
-            elif is_strong:
+            elif score_strong > 0:
                 if target_van:
                     v_items = df_items[df_items["VAN"] == target_van]
                     best = v_items.groupby("Article")["Qté vendue"].sum().sort_values(ascending=False).head(5)
-                    st.success(f"🏆 أفضل 5 منتجات مبيعاً للشاحنة **{target_van}**:")
+                    st.success(f"🏆 **السلع الأكثر مبيعاً** للشاحنة **{target_van}**:")
                     st.table(best)
                 else:
                     best = df_items.groupby("Article")["Qté vendue"].sum().sort_values(ascending=False).head(8)
-                    st.success("🏆 أفضل المنتجات مبيعاً إجمالاً:")
+                    st.success("🏆 **قائمة المنتجات الأكثر نجاحاً** إجمالاً:")
                     st.table(best)
 
-            elif is_sales:
+            elif score_sales > 0:
                 if target_van:
                     val = df_sales[df_sales["VAN"] == target_van]["Total"].sum()
-                    st.info(f"💰 إجمالي مبيعات **{target_van}** هو: **{val:,.0f} DA**")
+                    st.info(f"💰 إجمالي مبيعات الشاحنة **{target_van}** هو: **{val:,.0f} DA**")
                 else:
                     val = df_sales["Total"].sum()
-                    st.info(f"💰 إجمالي مبيعات الشركة هو: **{val:,.0f} DA**")
+                    st.info(f"💰 إجمالي مبيعات الشركة بالكامل حالياً: **{val:,.0f} DA**")
             
             else:
-                st.write("🤖 عذراً، لم أفهم القصد تماماً. جرب أن تسأل عن: 'أضعف سلع لشاحنة bifa 3' أو 'أفضل مبيعات'.")
+                st.write("🤖 عذراً، لا أزال أتعلم! جرب استخدام كلمات مثل: 'أضعف'، 'أفضل'، أو 'مبيعات' مع ذكر اسم الشاحنة.")
         
         st.markdown("---")
         # [AI Insights (MBA, ABC)...]

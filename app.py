@@ -135,7 +135,7 @@ m4.metric("Client Visits (PoS)", f"{total_visits:,}")
 
 st.markdown("---")
 
-tab1, tab2, tab3, tab4 = st.tabs(["📈 Visual Analysis", "📑 Detailed Jars", "🚚 VAN Inventory", "🛠️ Data Health"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Visual Analysis", "📑 Detailed Jars", "🚚 VAN Inventory", "🤖 AI Insights", "🛠️ Data Health"])
 
 with tab1:
     st.header("Visual Insights")
@@ -195,8 +195,50 @@ with tab4:
     try:
         df_nulls = pd.read_csv(RESULTS / "A7_null_summary.csv")
         st.dataframe(df_nulls)
+with tab5:
+    st.header("🧠 AI-Powered Insights")
+    st.info("These insights are generated using Machine Learning models (Association Rules, K-Means, and ABC Segmentation).")
+    
+    ai_col1, ai_col2 = st.columns(2)
+    
+    with ai_col1:
+        st.subheader("🛒 Market Basket Analysis (What sells together?)")
+        try:
+            df_rules = pd.read_csv(RESULTS / "AI_market_basket_rules.csv")
+            # Simplify view
+            df_display = df_rules[['antecedents', 'consequents', 'confidence', 'lift']].copy()
+            st.dataframe(df_display.head(50), use_container_width=True)
+            st.caption("Antecedents: If a client buys this... | Consequents: They are likely to also buy this.")
+        except:
+            st.write("Market Basket data not found.")
+
+    with ai_col2:
+        st.subheader("🔝 Product Priority (ABC Analysis)")
+        try:
+            df_abc = pd.read_csv(RESULTS / "AI_product_abc_analysis.csv")
+            st.dataframe(df_abc[['Article', 'Qté vendue', 'Class']], use_container_width=True)
+        except:
+            st.write("ABC Analysis data not found.")
+
+    st.markdown("---")
+    st.subheader("👥 Client Segmentation (K-Means Clustering)")
+    try:
+        df_clusters = pd.read_csv(RESULTS / "AI_client_segments.csv")
+        
+        # Performance check
+        c_stats = df_clusters.groupby('Segment').agg({
+            'Nom du client': 'count',
+            'Total': 'mean',
+            'Visits': 'mean'
+        }).rename(columns={'Nom du client': 'Client Count'}).reset_index()
+        
+        st.write("Summary per Segment:")
+        st.table(c_stats)
+        
+        st.write("Detailed Client List:")
+        st.dataframe(df_clusters[['Nom du client', 'Total', 'Visits', 'Segment']], use_container_width=True)
     except:
-        st.info("Null summary not available.")
+        st.write("Clustering data not found.")
 
 # ─── FOOTER ────────────────────────────────────────────────────────────────
 st.sidebar.markdown("---")

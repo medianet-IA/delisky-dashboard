@@ -195,6 +195,9 @@ with tab4:
     try:
         df_nulls = pd.read_csv(RESULTS / "A7_null_summary.csv")
         st.dataframe(df_nulls)
+    except:
+        st.info("Null summary not available.")
+
 with tab5:
     st.header("🧠 AI-Powered Insights")
     st.info("These insights are generated using Machine Learning models (Association Rules, K-Means, and ABC Segmentation).")

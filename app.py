@@ -268,54 +268,73 @@ if role in ["admin", "manager"]:
     with tabs[tab_idx]:
         st.header("🧠 رؤى وبوت ذكي")
         
-        # --- ADVANCED CHATBOT LOGIC ---
+        # --- ADVANCED AI CHATBOT LOGIC (REFINED) ---
         st.subheader("💬 اسأل بياناتك (Advanced AI Query)")
-        query = st.text_input("مثال: ما هي السلع الضعيفة لشاحنة nita 2؟ أو مبيعات liv01؟")
+        query = st.text_input("مثال: ما هي أضعف سلع لشاحنة bifa 3؟")
         
         if query:
-            q = query.lower()
+            # Normalize Arabic: (أ، إ، آ) -> ا | (ة) -> ه
+            def normalize_ar(t):
+                return t.replace('أ','ا').replace('إ','ا').replace('آ','ا').replace('ة','ه')
             
-            # 1. Identify VAN
+            q = normalize_ar(query.lower())
+            
+            # 1. SMART ENTITY EXTRACTION (VAN)
             target_van = None
-            vans = df_sales["VAN"].unique()
-            for v in vans:
-                if v.lower().split()[-1] in q or v.lower() in q:
+            all_vans = df_sales["VAN"].unique()
+            # Try to find a match (e.g., 'bifa 3' -> 'BIFA PSLIV03')
+            for v in all_vans:
+                v_norm = v.lower()
+                # If 'bifa 3' is in query, and it maps to 'bifa psliv03'
+                short_v = v_norm.replace('psliv0','').replace('psliv','')
+                if v_norm in q or short_v in q or (v_norm.split()[-1] in q and len(v_norm.split()[-1]) > 2):
                     target_van = v
                     break
             
-            # 2. Logic based on Intent
-            if "ضعيفة" in q or "أسوأ" in q or "low" in q or "weak" in q:
+            # Specials for 'bifa 3', 'nita 2' style shortcuts
+            if not target_van:
+                if "bifa 1" in q: target_van = "BIFA PSLIV01"
+                if "bifa 3" in q: target_van = "BIFA PSLIV03"
+                if "nita 1" in q: target_van = "NITA PSLIV01"
+                if "nita 2" in q: target_van = "NITA PSLIV02"
+
+            # 2. SMART INTENT DETECTION
+            is_weak = any(x in q for x in ["ضعيف", "اضعف", "اسوا", "اقل", "weak", "bad", "worst", "low"])
+            is_strong = any(x in q for x in ["قوي", "افضل", "احسن", "اكثر", "best", "top", "strong", "high", "great"])
+            is_sales = any(x in q for x in ["مبيعات", "اجمالي", "دخل", "ايرادات", "كم", "sales", "total", "revenue"])
+
+            if is_weak:
                 if target_van:
                     v_items = df_items[df_items["VAN"] == target_van]
                     worst = v_items.groupby("Article")["Qté vendue"].sum().sort_values().head(5)
-                    st.warning(f"📉 أقل 5 منتجات مبيعاً للشاحنة **{target_van}**:")
+                    st.warning(f"📉 أضعف 5 منتجات مبيعاً للشاحنة **{target_van}**:")
                     st.table(worst)
                 else:
-                    worst = df_items.groupby("Article")["Qté vendue"].sum().sort_values().head(5)
-                    st.warning("📉 أقل 5 منتجات مبيعاً بشكل عام:")
+                    worst = df_items.groupby("Article")["Qté vendue"].sum().sort_values().head(8)
+                    st.warning("📉 أضعف المنتجات مبيعاً في الشركة بالكامل:")
                     st.table(worst)
                     
-            elif "قوية" in q or "أفضل" in q or "افضل" in q or "best" in q or "top" in q:
+            elif is_strong:
                 if target_van:
                     v_items = df_items[df_items["VAN"] == target_van]
                     best = v_items.groupby("Article")["Qté vendue"].sum().sort_values(ascending=False).head(5)
                     st.success(f"🏆 أفضل 5 منتجات مبيعاً للشاحنة **{target_van}**:")
                     st.table(best)
                 else:
-                    best = df_items.groupby("Article")["Qté vendue"].sum().sort_values(ascending=False).head(5)
-                    st.success("🏆 أفضل 5 منتجات مبيعاً في كل الشركة:")
+                    best = df_items.groupby("Article")["Qté vendue"].sum().sort_values(ascending=False).head(8)
+                    st.success("🏆 أفضل المنتجات مبيعاً إجمالاً:")
                     st.table(best)
 
-            elif "إجمالي" in q or "مبيعات" in q or "total" in q or "sales" in q:
+            elif is_sales:
                 if target_van:
                     val = df_sales[df_sales["VAN"] == target_van]["Total"].sum()
                     st.info(f"💰 إجمالي مبيعات **{target_van}** هو: **{val:,.0f} DA**")
                 else:
                     val = df_sales["Total"].sum()
-                    st.info(f"💰 إجمالي المبيعات الكلي للشركة هو: **{val:,.0f} DA**")
+                    st.info(f"💰 إجمالي مبيعات الشركة هو: **{val:,.0f} DA**")
             
             else:
-                st.write("🤖 عذراً، لم أفهم القصد تماماً. جرب أن تسأل عن: 'السلع الضعيفة لـ [اسم الشاحنة]' أو 'أفضل مبيعات'.")
+                st.write("🤖 عذراً، لم أفهم القصد تماماً. جرب أن تسأل عن: 'أضعف سلع لشاحنة bifa 3' أو 'أفضل مبيعات'.")
         
         st.markdown("---")
         # [AI Insights (MBA, ABC)...]

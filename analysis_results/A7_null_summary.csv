@@ -1,0 +1,13 @@
+﻿Category,Column,Null_Count,Total_Rows,Null_Pct
+Items,Article,1,4061,0.0
+Items,Qté vendue,1,4061,0.0
+Items,Client,1,4061,0.0
+OpeningStock,Article,3,595,0.5
+PoS,Cause d'ignoration,2314,2649,87.4
+PoS,Message d'ignoration,2187,2649,82.6
+PoS,Date,1109,2649,41.9
+PoS,Nom du client,2,2649,0.1
+Sales,Region,11,603,1.8
+Sales,Date_Heure,2,603,0.3
+Sales,Nom du client,2,603,0.3
+Sales,Date,2,603,0.3
